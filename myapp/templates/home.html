@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+table {
+font-family: arial, sans-serif;
+border-collapse: collapse;
+width: 100%;
+}
+
+td, th {
+border: 1px solid #dddddd;
+text-align: left;
+padding: 8px;
+}
+
+tr:nth-child(even) {
+background-color: #dddddd;
+}
+
+    </style>
+</head>
+<body>
+<select id="product_id">
+    <option>select a product</option>
+    {%for id in all_products%}
+    <option value={{id}}>{{id}}</option>
+    {%endfor%}
+</select>
+<input type="number" min="0" step="1" id="qty">
+<input type="button" value="+" onclick="add_item()">
+<input type="number" id="customer_id" min="0">
+<br/>
+<input type="checkbox" id="vip"> 是否為vip身分</input>
+<br/>
+商品列表
+<table id="product_table">
+    <tr>
+        <th>product id</th>
+        <th>stock_pcs</th>
+        <th>price</th>
+        <th>shop_id</th>
+        <th>vip</th>
+    </tr>
+</table>
+訂單列表
+<table id="order_table">
+    <tr>
+        <th>Order ID</th>
+        <th>product_id</th>
+        <th>qty</th>
+        <th>price</th>
+        <th>shop_id</th>
+        <th>Customer ID</th>
+    </tr>
+</table>
+<br/>
+<input type="button" value="top3" onclick="top3()">
+</body>
+
+<script src="https://apps.bdimg.com/libs/jquery/1.11.1/jquery.min.js"></script>
+<script>
+    if (!String.prototype.format) {
+        String.prototype.format = function() {
+            var args = arguments;
+            return this.replace(/{(\d+)}/g, function(match, number) {
+            return typeof args[number] != 'undefined'
+            ? args[number]
+            : match
+            ;
+            });
+        };
+    }
+
+    $(document).ready(myfunc)
+
+    function delete_item(order_id){
+        $.ajax({url:"order/",method:"DELETE",data:{order_id:order_id},success:function(result){
+            if(result.success){
+                $("#product_{0} > td:nth-child(2)".format(result.product_id)).html(result.stock_pcs)
+            }
+            else{
+                window.alert("訂單已不存在")
+            }
+            $("#order_{0}".format(order_id)).remove()
+        }}
+        )
+    }
+
+    function generate_item(product){
+        if(product.vip) vip = "<input type=\"checkbox\" Checked onclick=\"return false\">"
+        else vip = "<input type=\"checkbox\" onclick=\"return false\">"
+
+        item = "<tr id=\"product_{0}\">".format(product.id)+"<td>"+product.id+"</td>"+"<td>"+product.stock_pcs
+        +"</td>"+"<td>"+product.price+"</td>"
+        +"<td>"+product.shop_id+"</td>"
+        +"<td>"+vip+"</td>"+"</tr>"
+        return item
+    }
+
+    function generate_order(order){
+        item = "<tr id=\"order_{0}\">".format(order.order_id)+"<td>"+order.order_id+"</td>"+"<td>"+order.product_id+"</td>"+"<td>"+order.qty
+        +"</td>"+"<td>"+order.price+"</td>"
+        +"<td>"+order.shop_id+"</td>"+"<td>"+order.customer_id+"</td><td><input type=\"button\" value=\"-\" onclick=\"delete_item({0})\"></td></tr>".format(order.order_id)
+
+        return item
+    }
+
+    function refresh_order(){
+    $.ajax({url:"order/all_orders",success:function(result){
+        for(order_id of result.all_orders){
+            add_order(order_id)
+        }
+        }
+    })
+    }
+
+    function myfunc(){
+        $.ajax({url:"product",success:function(result){
+            for(product of result.products){
+                $("#product_table").append(generate_item(product))
+            }
+        }
+        }
+        )
+        refresh_order()
+    }
+
+    function add_order(order_id){
+        $.ajax({url:"order/",data:{order_id:order_id},method:"GET",success:function(result){
+            $("#order_table").append(generate_order(result))
+            }
+        })
+    }
+
+    function add_item(){
+        id = $("#product_id").val()
+        qty = $("#qty").val()
+        customer_id = $("#customer_id").val()
+        vip = $("#vip").is(":checked")
+        if(id.length > 2 || qty.length == 0 || customer_id.length == 0){
+            window.alert("請正確填寫商品編號、數量及顧客編號")
+            return
+        }
+        $.ajax({url:"product/",data:{id:id,qty:qty,customer_id:customer_id,vip:vip},method:"POST",success:function(result){
+            if(result.success){
+                $("#product_{0} > td:nth-child(2)".format(id)).html(result.stock_pcs)
+                add_order(result.order_id)
+            }
+            else window.alert("庫存不足或身分不合！")
+            }
+        })
+    }
+
+    function top3(){
+        $.ajax({url:"top3/",success:function(result){
+            s = "前三名如下：\n"
+            for(i in result){
+            s +=　"商品{0}, 銷售量：{1}\n".format(i,result[i])
+            }
+            window.alert(s)
+            }
+        })
+    }
+
+</script>
+
+</html>
