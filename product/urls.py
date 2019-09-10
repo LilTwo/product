@@ -23,6 +23,5 @@ urlpatterns = [
     path('home/product/',views.product_api),
     path('home/order/',views.order_api),
     path('home/order/all_orders',views.all_orders),
-    path('home/top3/',views.get_top3),
-    path('home/send/',views.send_status)
+    path('home/top3/',views.get_top3)
 ]

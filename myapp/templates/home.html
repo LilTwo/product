@@ -144,7 +144,10 @@ background-color: #dddddd;
             window.alert("請正確填寫商品編號、數量及顧客編號")
             return
         }
-        $.ajax({url:"product/",data:{id:id,qty:qty,customer_id:customer_id,vip:vip},method:"POST",success:function(result){
+        qty = parseInt(qty)
+        data = JSON.stringify({id:id,qty:qty,customer_id:customer_id,vip:vip})
+        console.log(data)
+        $.ajax({url:"product/",data:data,dataType:"json",method:"POST",success:function(result){
             if(result.success){
                 $("#product_{0} > td:nth-child(2)".format(id)).html(result.stock_pcs)
                 add_order(result.order_id)

@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import QueryDict
 import json
 import smtplib
+from django.db import transaction
 
 
 def home(request):
@@ -20,26 +21,27 @@ def all_orders(request):
 
 
 def get_product(request):
+    print("123", request.GET)
     return JsonResponse({"products": [product.to_json() for product in Product.objects.all()]})
 
 
 def post_product(request):
-    qty, product_id, customer_id, vip = request.POST['qty'], request.POST['id'], request.POST["customer_id"], \
-                                        json.loads(request.POST["vip"])
-    qty = int(qty)
-    product = Product.objects.filter(id=product_id)[0]
+    json_data = json.loads(request.body)
+    qty, product_id, customer_id, vip = json_data['qty'], json_data['id'], json_data['customer_id'], json_data['vip']
 
-    if product.stock_pcs >= qty and ((not product.vip) or vip):
-        product.stock_pcs -= qty
-        order = Order()
-        order.product = product
-        order.qty = qty
-        order.customer_id = customer_id
-        product.save()
-        order.save()
-        return JsonResponse({"order_id": order.id, "stock_pcs": product.stock_pcs, "success": True})
-    else:
-        return JsonResponse({"success": False})
+    with transaction.atomic():
+        product = Product.objects.select_for_update().get(id=product_id)
+        if product.stock_pcs >= qty and ((not product.vip) or vip):
+            product.stock_pcs -= qty
+            order = Order()
+            order.product = product
+            order.qty = qty
+            order.customer_id = customer_id
+            product.save()
+            order.save()
+            return JsonResponse({"order_id": order.id, "stock_pcs": product.stock_pcs, "success": True})
+        else:
+            return JsonResponse({"success": False})
 
 
 @csrf_exempt
@@ -58,14 +60,15 @@ def get_order(request):
 
 def delete_order(request):
     order_id = QueryDict(request.body)["order_id"]
-    try:
-        order = Order.objects.filter(id=order_id)[0]
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id)
+        if not order.exists():
+            return JsonResponse({"success": False})
+        product = Product.objects.select_for_update.get(id=order.product_id)
         order.delete()
-        order.product.stock_pcs += order.qty
-        order.product.save()
+        product.stock_pcs += order.qty
+        product.save()
         return JsonResponse({"product_id": order.product.id, "stock_pcs": order.product.stock_pcs, "success": True})
-    except:
-        return JsonResponse({"success": False})
 
 
 @csrf_exempt
@@ -81,35 +84,3 @@ def get_top3(request):
         result[product.id] = sum(order.qty for order in orders)
     result = sorted(list(result.items()), key=lambda p: -p[1])[0:3]
     return JsonResponse(dict(result))
-
-
-def send_status(request):
-    gmail_user = 'sender mail'
-    gmail_password = 'sender password'
-
-    sent_from = gmail_user
-    to = request.GET["email"]
-    subject = 'order status'
-    body = ''
-    for shop in Shop.objects.all():
-        products = Product.objects.filter(shop_id=shop.id)
-        orders = sum([list(Order.objects.filter(product_id=product.id)) for product in products],[])
-        if not orders:
-            body += f"shop {shop.name}, no orders\n"
-        else:
-            body += f"shop {shop.name}, {len(orders)} orders, total money: {sum(order.qty*order.product.price for order in orders)}, total qty: {sum(order.qty for order in orders)}\n"
-    email_text = """From: %s\nTo: %s\nSubject: %s\n\n%s
-    """ % (sent_from, to, subject, body)
-
-    try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.ehlo()
-        server.login(gmail_user, gmail_password)
-        server.sendmail(sent_from, to, email_text)
-        server.close()
-
-        print("sent")
-        return JsonResponse({"success":True})
-    except Exception as e:
-        print(e)
-        return JsonResponse({"success":False})
