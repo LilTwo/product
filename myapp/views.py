@@ -61,10 +61,11 @@ def get_order(request):
 def delete_order(request):
     order_id = QueryDict(request.body)["order_id"]
     with transaction.atomic():
-        order = Order.objects.select_for_update().filter(id=order_id)
-        if not order.exists():
+        order_check = Order.objects.select_for_update().filter(id=order_id)
+        if not order_check.exists():
             return JsonResponse({"success": False})
-        product = Product.objects.select_for_update.get(id=order.product_id)
+        order = order_check[0]
+        product = Product.objects.select_for_update().get(id=order.product_id)
         order.delete()
         product.stock_pcs += order.qty
         product.save()

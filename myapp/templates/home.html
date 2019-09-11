@@ -23,6 +23,7 @@ background-color: #dddddd;
     </style>
 </head>
 <body>
+<pre class="tab">商品編號           購買數量                 顧客編號</pre>
 <select id="product_id">
     <option>select a product</option>
     {%for id in all_products%}
@@ -30,8 +31,8 @@ background-color: #dddddd;
     {%endfor%}
 </select>
 <input type="number" min="0" step="1" id="qty">
-<input type="button" value="+" onclick="add_item()">
 <input type="number" id="customer_id" min="0">
+<input type="button" value="+" onclick="add_item()">
 <br/>
 <input type="checkbox" id="vip"> 是否為vip身分</input>
 <br/>
